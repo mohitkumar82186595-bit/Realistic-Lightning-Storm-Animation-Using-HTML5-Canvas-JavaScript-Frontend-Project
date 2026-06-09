@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lightning Storm Scene</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: #050505;
+        }
+        canvas {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+
+<canvas id="sky"></canvas>
+
+<script>
+    /**
+     * REAL CODING: HTML5 Canvas Storm Engine
+     */
+    const canvas = document.getElementById('sky');
+    const ctx = canvas.getContext('2d');
+
+    // Configuration
+    let width, height;
+    let lastTime = 0;
+    
+    // Storm State
+    const state = {
+        rainDrops: [],
+        lightningTimer: 0,
+        lightningOpacity: 0,
+        flashColor: 'rgba(255, 255, 255, 0)',
+        clouds: []
+    };
+
+    // Configuration constants
+    const CFG = {
+        rainCount: 500,
+        rainSpeed: 15,
+        lightningInterval: 300, // frames between strikes
+    };
+
+    // --- INITIALIZATION ---
+    function resize() {
+        width = canvas.width = window.innerWidth;
+        height = canvas.height = window.innerHeight;
+        initClouds();
+    }
+
+    function initClouds() {
+        // Create 8 cloud layers
+        state.clouds = [];
+        for (let i = 0; i < 8; i++) {
+            state.clouds.push({
+                x: Math.random() * width,
+                y: (height * 0.1) + (Math.random() * height * 0.3),
+                radius: 50 + Math.random() * 100,
+                speed: 0.2 + Math.random() * 0.5,
+                opacity: 0.1 + Math.random() * 0.3
+            });
+        }
+    }
+
+    // --- DRAWING FUNCTIONS ---
+
+    function drawBackground() {
+        // Dark stormy gradient
+        const gradient = ctx.createLinearGradient(0, 0, 0, height);
+        gradient.addColorStop(0, '#101015');
+        gradient.addColorStop(1, '#151520');
+        
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, width, height);
+    }
+
+    function drawClouds() {
+        state.clouds.forEach(cloud => {
+            // Move cloud
+            cloud.x += cloud.speed;
+            if (cloud.x - cloud.radius > width) {
+                cloud.x = -cloud.radius * 2;
+            }
+
+            // Draw cloud (multiple circles for fluffiness)
+            for (let j = 0; j < 5; j++) {
+                const offsetX = (Math.sin(j) * cloud.radius);
+                const offsetY = (Math.cos(j) * (cloud.radius * 0.5));
+                
+                ctx.beginPath();
+                ctx.arc(cloud.x + offsetX, cloud.y + offsetY, cloud.radius, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(40, 44, 52, ${cloud.opacity})`;
+                ctx.fill();
+            }
+        });
+    }
+
+    function drawRain() {
+        ctx.strokeStyle = 'rgba(174, 194, 224, 0.5)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+
+        state.rainDrops.forEach(drop => {
+            // Update position
+            drop.x += drop.vx;
+            drop.y += drop.vy;
+            
+            // Reset if off screen
+            if (drop.y > height) {
+                drop.y = -10;
+                drop.x = Math.random() * width;
+            }
+            if (drop.x > width) {
+                drop.x = 0;
+            }
+
+            // Draw rain drop (line)
+            ctx.moveTo(drop.x, drop.y);
+            ctx.lineTo(drop.x - 1, drop.y + 10);
+        });
+        
+        ctx.stroke();
+    }
+
+    function manageRain() {
+        // Add drops if needed
+        while(state.rainDrops.length < CFG.rainCount) {
+            state.rainDrops.push({
+                x: Math.random() * width,
+                y: Math.random() * height,
+                vx: -1, // wind x
+                vy: CFG.rainSpeed + Math.random() * 5 // wind y/speed
+            });
+        }
+    }
+
+    function drawLightning() {
+        // Calculate flash intensity
+        if (state.lightningTimer > CFG.lightningInterval - 10) {
+            // Spike logic
+            const timeLeft = (CFG.lightningInterval - state.lightningTimer);
+            
+            if (timeLeft === 0 || timeLeft === 3 || timeLeft === 6) {
+                state.flashColor = 'rgba(255, 255, 255, 0.8)';
+            } else {
+                state.flashColor = 'rgba(255, 255, 255, 0)';
+            }
+        } else {
+            state.flashColor = 'rgba(255, 255, 255, 0)';
+            if (state.lightningTimer >= CFG.lightningInterval) {
+                state.lightningTimer = 0;
+                
+                // Draw Bolt
+                drawLightningBolt();
+            }
+        }
+
+        // Apply flash
+        if (state.flashColor !== 'rgba(255, 255, 255, 0)') {
+            ctx.fillStyle = state.flashColor;
+            ctx.fillRect(0, 0, width, height);
+        }
+    }
+
+    function drawLightningBolt() {
+        ctx.save();
+        ctx.beginPath();
+        
+        // Random start X
+        let startX = Math.random() * width;
+        let startY = 0;
+        
+        ctx.moveTo(startX, startY);
+        
+        // Jagged path down
+        for (let i = 0; i < height; i += 20) {
+            const zig = (Math.random() - 0.5) * 40;
+            startX += zig;
+            startY += 20;
+            
+            ctx.lineTo(startX, startY);
+        }
+        
+        ctx.lineWidth = 4;
+        ctx.strokeStyle = 'white';
+        ctx.shadowBlur = 20;
+        ctx.shadowColor = 'white';
+        ctx.stroke();
+        
+        ctx.restore();
+    }
+
+    // --- MAIN LOOP ---
+    function animate(timestamp) {
+        // Clear screen
+        ctx.clearRect(0, 0, width, height);
+
+        // 1. Draw Sky
+        drawBackground();
+
+        // 2. Draw Clouds (Back layer)
+        drawClouds();
+
+        // 3. Handle Rain Logic
+        manageRain();
+
+        // 4. Draw Rain
+        drawRain();
+
+        // 5. Lightning Logic
+        state.lightningTimer++;
+        drawLightning();
+
+        // Loop
+        requestAnimationFrame(animate);
+    }
+
+    // Start
+    window.addEventListener('resize', resize);
+    resize(); // Initial setup
+    requestAnimationFrame(animate);
+
+</script>
+</body>
+</html>
